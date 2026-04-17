@@ -127,6 +127,8 @@
 // };
 
 import TimeEntry from "../Model/TimeEntry.js";
+import Customer from "../Model/Customer.js";
+import mongoose from "mongoose";
 import type { Request, Response } from "express";
 
 /* =========================
@@ -159,9 +161,16 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ FIX: ensure only user-specific data
+    const adminId = new mongoose.Types.ObjectId(userId);
+
+    // ✅ FIX: count explicit customers added by user
+    const totalClients = await Customer.countDocuments({
+      userId: adminId,
+    });
+
+    // ✅ FIX: ensure only user-specific data for timers
     const timers = await TimeEntry.find({
-      userId: userId, // (explicit for clarity)
+      userId: adminId, 
     });
 
     let totalSeconds = 0;
@@ -174,12 +183,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       totalEarned += t.amount || 0;
     });
 
-    // ✅ FIX: remove undefined emails
-    const uniqueClients = new Set(
-      timers
-        .map((t) => t.customer?.email)
-        .filter(Boolean) // ✅ prevents undefined
-    );
+    // (Removed computing uniqueClients from TimeEntry as we use Customer count directly)
 
 //     const uniqueClients = new Set(
 //   timers
@@ -198,11 +202,10 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 
 // const totalClients = uniqueClients.length;
 
-console.log("UNIQUE CLIENTS:", [...uniqueClients]);
-console.log("COUNT:", uniqueClients.size);
+// Logging removed as uniqueClients is explicitly queried from Customer limit now
 
     res.status(200).json({
-      totalClients: uniqueClients.size,
+      totalClients: totalClients,
       activeNow: activeTimers.length,
       totalEarned: parseFloat(totalEarned.toFixed(2)),
       totalTime: formatTime(totalSeconds),
